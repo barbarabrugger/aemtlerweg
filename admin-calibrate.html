@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ämtlerweg – Stationskoordinaten kalibrieren</title>
+  <link rel="stylesheet" href="lib/leaflet.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f0f4f0; color: #1a1a1a; }
+
+    .top-bar {
+      background: #1B4332; color: white;
+      padding: .75rem 1rem;
+      display: flex; align-items: center; gap: 1rem;
+      flex-wrap: wrap;
+    }
+    .top-bar h1 { font-size: 1rem; font-weight: 700; }
+    .top-bar p  { font-size: .8rem; opacity: .8; flex: 1; }
+    .btn {
+      padding: .5rem 1rem;
+      border: none; border-radius: 6px;
+      font-size: .85rem; font-weight: 600; cursor: pointer;
+    }
+    .btn-export { background: #52B788; color: #1B4332; }
+    .btn-export:hover { background: #74C69D; }
+    .btn-reset  { background: rgba(255,255,255,.15); color: white; }
+    .btn-reset:hover { background: rgba(255,255,255,.25); }
+
+    .layout { display: flex; height: calc(100vh - 52px); }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px; flex-shrink: 0;
+      background: white; border-right: 1px solid #dde5dd;
+      overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+    .sidebar-header {
+      padding: .75rem; border-bottom: 1px solid #eee;
+      font-size: .75rem; font-weight: 600; color: #555;
+      position: sticky; top: 0; background: white; z-index: 1;
+    }
+    .station-row {
+      padding: .6rem .75rem;
+      border-bottom: 1px solid #f0f4f0;
+      cursor: pointer;
+      transition: background .1s;
+    }
+    .station-row:hover { background: #f0f4f0; }
+    .station-row.selected { background: #D8F3DC; }
+    .station-row.modified { border-left: 3px solid #52B788; }
+    .station-row-header { display: flex; align-items: center; gap: .5rem; }
+    .station-num {
+      width: 24px; height: 24px; flex-shrink: 0;
+      background: #2D6A4F; color: white;
+      border-radius: 50%; font-size: .7rem; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .station-name { font-size: .82rem; font-weight: 600; }
+    .station-coords {
+      font-size: .7rem; color: #888; margin-top: 3px;
+      font-family: monospace;
+    }
+    .modified-badge {
+      display: inline-block; background: #52B788;
+      color: #1B4332; font-size: .6rem; font-weight: 700;
+      padding: 1px 5px; border-radius: 10px; margin-left: auto;
+    }
+
+    /* Map */
+    #map { flex: 1; }
+
+    /* Info panel */
+    .info-panel {
+      position: absolute; bottom: 20px; right: 20px; z-index: 1000;
+      background: white; border-radius: 10px;
+      padding: 1rem; box-shadow: 0 4px 16px rgba(0,0,0,.15);
+      max-width: 280px; font-size: .82rem;
+    }
+    .info-panel strong { color: #2D6A4F; }
+    .info-panel .hint { color: #888; font-size: .75rem; margin-top: .4rem; }
+
+    /* Export modal */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(0,0,0,.6);
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+    .modal {
+      background: white; border-radius: 12px;
+      padding: 1.5rem; max-width: 720px; width: 90%; max-height: 80vh;
+      overflow: auto;
+    }
+    .modal h2 { font-size: 1rem; margin-bottom: 1rem; color: #1B4332; }
+    .modal pre {
+      background: #f4f7f4; padding: 1rem;
+      border-radius: 6px; font-size: .75rem;
+      overflow: auto; max-height: 400px;
+      white-space: pre-wrap;
+    }
+    .modal-actions { display: flex; gap: .5rem; margin-top: 1rem; justify-content: flex-end; }
+    .btn-copy { background: #2D6A4F; color: white; }
+    .btn-close-modal { background: #eee; color: #333; }
+  </style>
+</head>
+<body>
+
+<div class="top-bar">
+  <h1>🗺️ Ämtlerweg – Koordinaten kalibrieren</h1>
+  <p>Marker per Drag & Drop auf die richtige Position ziehen. Dann «Export» klicken.</p>
+  <button class="btn btn-reset" id="btn-reset">Alle zurücksetzen</button>
+  <button class="btn btn-export" id="btn-export">⬇ Export JSON</button>
+</div>
+
+<div class="layout">
+  <div class="sidebar">
+    <div class="sidebar-header">22 Stationen · klicken zum Zentrieren</div>
+    <div id="station-list"></div>
+  </div>
+  <div id="map"></div>
+</div>
+
+<div class="info-panel" id="info-panel">
+  <strong id="info-name">Station wählen</strong><br>
+  <span id="info-coords" style="font-family:monospace; font-size:.75rem"></span>
+  <div class="hint">📍 Marker ziehen zum Anpassen.<br>Klick auf Karte → ausgewählte Station verschieben.</div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h2>📋 Aktualisierte Koordinaten – in <code>js/stations-data.js</code> einfügen</h2>
+    <p style="font-size:.8rem;color:#555;margin-bottom:.75rem">
+      Kopieren Sie die untenstehenden Koordinaten-Einträge und ersetzen Sie die entsprechenden
+      <code>coordinates:</code> Zeilen in <code>js/stations-data.js</code>.
+    </p>
+    <pre id="export-output"></pre>
+    <div class="modal-actions">
+      <button class="btn btn-copy" id="btn-copy-export">Kopieren</button>
+      <button class="btn btn-close-modal" id="btn-close-modal">Schliessen</button>
+    </div>
+  </div>
+</div>
+
+<script src="lib/leaflet.js"></script>
+<script src="js/config.js"></script>
+<script src="js/stations-data.js"></script>
+<script>
+// ── State ────────────────────────────────────────────────────
+const positions = STATIONS_DATA.map(s => ({
+  id: s.id,
+  number: s.number,
+  name: s.name,
+  lat: s.coordinates[0],
+  lon: s.coordinates[1],
+  original: { lat: s.coordinates[0], lon: s.coordinates[1] },
+  modified: false,
+}));
+
+let selectedId = null;
+const markers = {};
+
+// ── Map ──────────────────────────────────────────────────────
+const map = L.map('map', {
+  center: CONFIG.MAP_CENTER,
+  zoom: CONFIG.MAP_ZOOM,
+});
+
+L.tileLayer('https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg', {
+  attribution: '© swisstopo',
+  maxZoom: 19,
+}).addTo(map);
+
+// Route preview (non-interactive)
+L.polyline(positions.map(p => [p.lat, p.lon]), {
+  color: '#2D6A4F', weight: 2, opacity: .4, dashArray: '6 4',
+}).addTo(map);
+
+// ── Markers ──────────────────────────────────────────────────
+function makeIcon(num, selected, modified) {
+  const bg    = selected ? '#E76F51' : modified ? '#52B788' : '#2D6A4F';
+  const size  = selected ? 36 : 30;
+  const off   = size / 2;
+  return L.divIcon({
+    className: '',
+    html: `<div style="width:${size}px;height:${size}px;background:${bg};border:3px solid white;
+                border-radius:50%;color:white;font-size:.7rem;font-weight:700;
+                display:flex;align-items:center;justify-content:center;
+                box-shadow:0 2px 6px rgba(0,0,0,.35);cursor:grab">${num}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [off, off],
+  });
+}
+
+function addMarker(pos) {
+  const marker = L.marker([pos.lat, pos.lon], {
+    draggable: true,
+    icon: makeIcon(pos.number, false, pos.modified),
+  }).addTo(map);
+
+  marker.on('dragend', () => {
+    const ll = marker.getLatLng();
+    pos.lat = parseFloat(ll.lat.toFixed(6));
+    pos.lon = parseFloat(ll.lng.toFixed(6));
+    pos.modified = true;
+    marker.setIcon(makeIcon(pos.number, pos.id === selectedId, true));
+    updateSidebar();
+    updateInfoPanel(pos);
+  });
+
+  marker.on('click', () => selectStation(pos.id));
+
+  markers[pos.id] = marker;
+}
+
+positions.forEach(addMarker);
+
+// Click on map → move selected station
+map.on('click', e => {
+  if (!selectedId) return;
+  const pos = positions.find(p => p.id === selectedId);
+  if (!pos) return;
+  pos.lat = parseFloat(e.latlng.lat.toFixed(6));
+  pos.lon = parseFloat(e.latlng.lng.toFixed(6));
+  pos.modified = true;
+  markers[selectedId].setLatLng([pos.lat, pos.lon]);
+  markers[selectedId].setIcon(makeIcon(pos.number, true, true));
+  updateSidebar();
+  updateInfoPanel(pos);
+});
+
+// ── Sidebar ──────────────────────────────────────────────────
+function buildSidebar() {
+  const list = document.getElementById('station-list');
+  list.innerHTML = positions.map(p => `
+    <div class="station-row${p.id === selectedId ? ' selected' : ''}${p.modified ? ' modified' : ''}"
+         id="row-${p.id}" onclick="selectStation(${p.id})">
+      <div class="station-row-header">
+        <div class="station-num">${p.number}</div>
+        <div class="station-name">${p.name}</div>
+        ${p.modified ? '<span class="modified-badge">geändert</span>' : ''}
+      </div>
+      <div class="station-coords">${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</div>
+    </div>
+  `).join('');
+}
+
+function updateSidebar() {
+  positions.forEach(p => {
+    const row = document.getElementById(`row-${p.id}`);
+    if (!row) return;
+    row.className = `station-row${p.id === selectedId ? ' selected' : ''}${p.modified ? ' modified' : ''}`;
+    row.querySelector('.station-coords').textContent = `${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}`;
+    const badge = row.querySelector('.modified-badge');
+    if (p.modified && !badge) {
+      row.querySelector('.station-row-header').insertAdjacentHTML('beforeend', '<span class="modified-badge">geändert</span>');
+    }
+  });
+}
+
+// ── Select ───────────────────────────────────────────────────
+function selectStation(id) {
+  const prev = selectedId;
+  selectedId = id;
+
+  if (prev && markers[prev]) {
+    const pp = positions.find(p => p.id === prev);
+    markers[prev].setIcon(makeIcon(pp.number, false, pp.modified));
+  }
+
+  const pos = positions.find(p => p.id === id);
+  markers[id].setIcon(makeIcon(pos.number, true, pos.modified));
+  map.setView([pos.lat, pos.lon], Math.max(map.getZoom(), 15), { animate: true });
+
+  updateInfoPanel(pos);
+  updateSidebar();
+
+  // Scroll sidebar
+  const row = document.getElementById(`row-${id}`);
+  row?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function updateInfoPanel(pos) {
+  document.getElementById('info-name').textContent = `${pos.number}. ${pos.name}`;
+  document.getElementById('info-coords').textContent = `${pos.lat.toFixed(6)}, ${pos.lon.toFixed(6)}`;
+}
+
+// ── Export ───────────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', () => {
+  const modified = positions.filter(p => p.modified);
+  const lines = positions.map(p => {
+    const flag = p.modified ? '  // ✓ kalibriert' : '';
+    return `  // Station ${p.number}: ${p.name}\n  coordinates: [${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}],${flag}`;
+  });
+
+  const summary = `// Exportiert: ${new Date().toLocaleString('de-CH')}
+// Geändert: ${modified.length} / ${positions.length} Stationen
+//
+// Ersetzen Sie in js/stations-data.js die coordinates-Zeilen:
+${positions.map(p => {
+  const flag = p.modified ? ' ✓' : '';
+  return `  { id: ${p.id}, /* ${p.name} */ coordinates: [${p.lat.toFixed(6)}, ${p.lon.toFixed(6)}] },${flag}`;
+}).join('\n')}`;
+
+  document.getElementById('export-output').textContent = summary;
+  document.getElementById('modal').classList.add('show');
+});
+
+document.getElementById('btn-copy-export').addEventListener('click', () => {
+  const text = document.getElementById('export-output').textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    document.getElementById('btn-copy-export').textContent = '✓ Kopiert!';
+    setTimeout(() => { document.getElementById('btn-copy-export').textContent = 'Kopieren'; }, 2000);
+  });
+});
+
+document.getElementById('btn-close-modal').addEventListener('click', () => {
+  document.getElementById('modal').classList.remove('show');
+});
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  if (!confirm('Alle Änderungen zurücksetzen?')) return;
+  positions.forEach(p => {
+    p.lat = p.original.lat; p.lon = p.original.lon; p.modified = false;
+    markers[p.id].setLatLng([p.lat, p.lon]);
+    markers[p.id].setIcon(makeIcon(p.number, p.id === selectedId, false));
+  });
+  buildSidebar();
+});
+
+// ── Init ─────────────────────────────────────────────────────
+buildSidebar();
+</script>
+</body>
+</html>

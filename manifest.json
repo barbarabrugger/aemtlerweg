@@ -3,7 +3,7 @@
   "short_name": "Ämtlerweg",
   "description": "Interaktive App für den Ämtlerweg – 46 km Rundwanderung durch das Knonauer Amt mit 22 Stationen.",
   "lang": "de",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#2D6A4F",
   "theme_color": "#2D6A4F",
@@ -23,14 +23,14 @@
       "name": "Karte öffnen",
       "short_name": "Karte",
       "description": "Direkt zur Wanderkarte",
-      "url": "/#map",
+      "url": "./#map",
       "icons": [{ "src": "assets/icon.svg", "sizes": "any" }]
     },
     {
       "name": "Problem melden",
       "short_name": "Melden",
       "description": "Schaden direkt melden",
-      "url": "/#report",
+      "url": "./#report",
       "icons": [{ "src": "assets/icon.svg", "sizes": "any" }]
     }
   ]

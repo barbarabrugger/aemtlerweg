@@ -8,18 +8,20 @@ const MAP_CACHE  = 'aemtlerweg-tiles-v1';
 const MAX_TILE_CACHE = 500; // maximale Anzahl gecachter Kartenkacheln
 
 // App Shell – immer lokal verfügbar
+// Relative Pfade damit der Service Worker auf GitHub Pages
+// (Subdirectory /aemtlerweg/) korrekt funktioniert.
 const SHELL_ASSETS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/css/style.css',
-  '/js/config.js',
-  '/js/stations-data.js',
-  '/js/map.js',
-  '/js/stations-view.js',
-  '/js/report.js',
-  '/js/app.js',
-  '/assets/icon.svg',
+  './',
+  './index.html',
+  './manifest.json',
+  './css/style.css',
+  './js/config.js',
+  './js/stations-data.js',
+  './js/map.js',
+  './js/stations-view.js',
+  './js/report.js',
+  './js/app.js',
+  './assets/icon.svg',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
   'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
 ];

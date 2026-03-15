@@ -22,8 +22,8 @@ const SHELL_ASSETS = [
   './js/report.js',
   './js/app.js',
   './assets/icon.svg',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css',
-  'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js',
+  './lib/leaflet.js',
+  './lib/leaflet.css',
 ];
 
 // ── Install ──────────────────────────────────────────────────
@@ -62,10 +62,7 @@ self.addEventListener('fetch', event => {
   }
 
   // App Shell → Cache-first
-  if (
-    url.hostname === location.hostname ||
-    url.hostname.includes('unpkg.com')
-  ) {
+  if (url.hostname === location.hostname) {
     event.respondWith(_cacheFirst(event.request));
     return;
   }

@@ -14,11 +14,11 @@
   <meta name="apple-mobile-web-app-title" content="Ämtlerweg">
   <meta name="mobile-web-app-capable" content="yes">
 
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <title>Ämtlerweg</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <!-- Leaflet (lokal, kein CDN) -->
+  <link rel="stylesheet" href="lib/leaflet.css">
 
   <!-- App CSS -->
   <link rel="stylesheet" href="css/style.css">
@@ -301,8 +301,7 @@
 </div><!-- #app -->
 
 <!-- Scripts -->
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN2GqnXc=" crossorigin=""></script>
+<script src="lib/leaflet.js"></script>
 <script src="js/config.js"></script>
 <script src="js/stations-data.js"></script>
 <script src="js/map.js"></script>
